@@ -1,93 +1,36 @@
-import { useState } from "react";
+const handleFile = (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
 
-export default function Home() {
-  const [formData, setFormData] = useState({
-    name: "",
-    birthName: "",
-    dob: "",
-    birthTime: "",
-    birthPlace: "",
-    district: "",
-    gotra: "",
-    height: "",
-    bloodGroup: "",
-    qualification: "",
-    occupation: "",
-    fatherName: "",
-    motherName: "",
-    sisterName: "",
-    residence: "",
-    permanentAddress: "",
-    mobileMother: "",
-    mobileMama: "",
-    photo: null,
-    photoType: null,
-  });
+  const reader = new FileReader();
+  reader.onloadend = () => {
+    const img = new Image();
+    img.onload = () => {
+      // Define max dimensions for PDF photo box
+      const maxWidth = 200;
+      const maxHeight = 250;
 
-  const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
-  };
+      let { width, height } = img;
 
-  const handleFile = (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
+      // Scale down while preserving aspect ratio
+      const ratio = Math.min(maxWidth / width, maxHeight / height, 1);
+      width = width * ratio;
+      height = height * ratio;
 
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      const base64 = reader.result.split(",")[1];
-      setFormData({ ...formData, photo: base64, photoType: file.type });
+      // Draw on canvas
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext("2d");
+      ctx.fillStyle = "#fff"; // white background
+      ctx.fillRect(0, 0, width, height);
+      ctx.drawImage(img, 0, 0, width, height);
+
+      // Export cleaned JPG
+      const jpgBase64 = canvas.toDataURL("image/jpeg", 0.9).split(",")[1];
+      setFormData({ ...formData, photo: jpgBase64 });
     };
-    reader.readAsDataURL(file);
+    img.src = reader.result;
   };
-
-  const handleDownload = async () => {
-    const res = await fetch("/api/generate-pdf", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(formData),
-    });
-
-    const blob = await res.blob();
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "biodata.pdf";
-    a.click();
-    window.URL.revokeObjectURL(url);
-  };
-
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100 p-6">
-      <div className="bg-white shadow-xl rounded-2xl p-6 w-full max-w-2xl">
-        <h1 className="text-2xl font-bold mb-4 text-center">Biodata Generator</h1>
-        <form className="grid grid-cols-2 gap-4">
-          {Object.keys(formData).map((key) =>
-            key !== "photo" && key !== "photoType" ? (
-              <input
-                key={key}
-                type="text"
-                name={key}
-                placeholder={key.replace(/([A-Z])/g, " $1")}
-                value={formData[key]}
-                onChange={handleChange}
-                className="border rounded p-2"
-              />
-            ) : null
-          )}
-          <input
-            type="file"
-            accept="image/*"
-            onChange={handleFile}
-            className="col-span-2"
-          />
-        </form>
-        <button
-          onClick={handleDownload}
-          className="mt-6 w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700"
-        >
-          Download PDF
-        </button>
-      </div>
-    </div>
-  );
-}
+  reader.readAsDataURL(file);
+};
