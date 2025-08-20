@@ -10,7 +10,7 @@ export default async function handler(req, res) {
     gotra, height, bloodGroup, qualification, occupation,
     fatherName, motherName, sisterName, residence,
     permanentAddress, mobileMother, mobileMama,
-    photo, photoType
+    photo
   } = req.body;
 
   const pdfDoc = await PDFDocument.create();
@@ -21,7 +21,7 @@ export default async function handler(req, res) {
   const pageHeight = page.getHeight();
 
   // Title
-  page.drawText(`BIO DATA : ${name}`, {
+  page.drawText(`BIO DATA : ${name || ""}`, {
     x: pageWidth / 2 - 80,
     y: pageHeight - 40,
     size: 18,
@@ -34,7 +34,7 @@ export default async function handler(req, res) {
     ["Name", name],
     ["Birth Name", birthName],
     ["DOB", dob],
-    ["Birth time", birthTime],
+    ["Birth Time", birthTime],
     ["Birth Place", birthPlace],
     ["District", district],
     ["Gotra", gotra],
@@ -63,26 +63,36 @@ export default async function handler(req, res) {
     y -= 25;
   });
 
-  // Add Photo (right side, vertically centered)
-  if (photo && photoType) {
+  // Add Photo (right side under heading, fixed box)
+  if (photo) {
     try {
       const imageBytes = Buffer.from(photo, "base64");
-      let img;
-      if (photoType.includes("png")) {
-        img = await pdfDoc.embedPng(imageBytes);
-      } else if (photoType.includes("jpeg") || photoType.includes("jpg")) {
-        img = await pdfDoc.embedJpg(imageBytes);
-      }
+      const img = await pdfDoc.embedJpg(imageBytes);
 
-      if (img) {
-        const scale = 0.35; // adjust size
-        const { width, height } = img.scale(scale);
+      // Fixed box for photo
+      const boxWidth = 200;
+      const boxHeight = 250;
 
-        const x = pageWidth - width - 40; // 40px margin from right
-        const y = (pageHeight - height) / 2; // vertical center
+      const x = pageWidth - boxWidth - 50;  // margin from right
+      const y = pageHeight - boxHeight - 80; // just under the title
 
-        page.drawImage(img, { x, y, width, height });
-      }
+      page.drawImage(img, {
+        x,
+        y,
+        width: boxWidth,
+        height: boxHeight,
+      });
+
+      // Optional border/frame around photo
+      page.drawRectangle({
+        x,
+        y,
+        width: boxWidth,
+        height: boxHeight,
+        borderColor: rgb(0, 0, 0),
+        borderWidth: 1,
+      });
+
     } catch (e) {
       console.error("Error embedding photo:", e);
     }
