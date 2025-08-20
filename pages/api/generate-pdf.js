@@ -17,10 +17,13 @@ export default async function handler(req, res) {
   const page = pdfDoc.addPage([800, 600]);
   const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
 
+  const pageWidth = page.getWidth();
+  const pageHeight = page.getHeight();
+
   // Title
   page.drawText(`BIO DATA : ${name}`, {
-    x: 250,
-    y: 550,
+    x: pageWidth / 2 - 80,
+    y: pageHeight - 40,
     size: 18,
     font,
     color: rgb(0, 0, 0),
@@ -48,7 +51,7 @@ export default async function handler(req, res) {
     ["Mobile Number (Mama)", mobileMama],
   ];
 
-  let y = 500;
+  let y = pageHeight - 80;
   details.forEach(([label, value]) => {
     page.drawText(`• ${label} : ${value || "-"}`, {
       x: 50,
@@ -60,7 +63,7 @@ export default async function handler(req, res) {
     y -= 25;
   });
 
-  // Add Photo (handles JPG, PNG, WebP etc.)
+  // Add Photo (right side, vertically centered)
   if (photo && photoType) {
     try {
       const imageBytes = Buffer.from(photo, "base64");
@@ -69,20 +72,16 @@ export default async function handler(req, res) {
         img = await pdfDoc.embedPng(imageBytes);
       } else if (photoType.includes("jpeg") || photoType.includes("jpg")) {
         img = await pdfDoc.embedJpg(imageBytes);
-      } else if (photoType.includes("webp")) {
-        // pdf-lib doesn’t support webp directly → quick fallback: convert on client
-        // (For now, we’ll just ignore unsupported types)
-        console.warn("WebP not supported by pdf-lib directly");
       }
 
       if (img) {
-        const { width, height } = img.scale(0.25);
-        page.drawImage(img, {
-          x: 550,
-          y: 250,
-          width,
-          height,
-        });
+        const scale = 0.35; // adjust size
+        const { width, height } = img.scale(scale);
+
+        const x = pageWidth - width - 40; // 40px margin from right
+        const y = (pageHeight - height) / 2; // vertical center
+
+        page.drawImage(img, { x, y, width, height });
       }
     } catch (e) {
       console.error("Error embedding photo:", e);
