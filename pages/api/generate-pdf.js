@@ -5,59 +5,47 @@ export default async function handler(req, res) {
     try {
       const { formData, image } = req.body;
 
-      // Create high-resolution PDF with bigger page size
+      // High-resolution PDF
       const doc = new jsPDF({
         orientation: "landscape",
         unit: "px",
-        format: [2400, 1800], // custom dimensions
+        format: [2400, 1800],
       });
 
       // Title
-      doc.setFontSize(48);
-      doc.text("Biodata", 100, 100);
+      doc.setFontSize(80);
+      doc.text("Biodata", 100, 150);
 
-      // Add biodata text (left side)
-      doc.setFontSize(28);
-      let y = 200;
+      // Add form data
+      doc.setFontSize(48);
+      let y = 300;
       for (const [key, value] of Object.entries(formData)) {
         doc.text(`${key}: ${value}`, 100, y);
-        y += 50;
+        y += 70;
       }
 
-      // If image exists
+      // Add Image (if provided)
       if (image) {
-        const img = new Image();
-        img.src = image;
+        try {
+          // Force image type detection
+          let imgType = "JPEG";
+          if (image.startsWith("data:image/png")) imgType = "PNG";
 
-        await new Promise((resolve, reject) => {
-          img.onload = () => resolve();
-          img.onerror = reject;
-        });
+          // Reserved box for image
+          const boxX = 1600;
+          const boxY = 300;
+          const boxWidth = 700;
+          const boxHeight = 1000;
 
-        // Reserved area for image (right side)
-        const boxX = 1600;
-        const boxY = 200;
-        const boxWidth = 600;
-        const boxHeight = 1000;
-
-        const imgWidth = img.width;
-        const imgHeight = img.height;
-
-        // Scale image proportionally to fit inside reserved box
-        const scale = Math.min(boxWidth / imgWidth, boxHeight / imgHeight);
-
-        const finalWidth = imgWidth * scale;
-        const finalHeight = imgHeight * scale;
-
-        // Center image inside reserved box
-        const offsetX = boxX + (boxWidth - finalWidth) / 2;
-        const offsetY = boxY + (boxHeight - finalHeight) / 2;
-
-        doc.addImage(img, "JPEG", offsetX, offsetY, finalWidth, finalHeight);
+          // jsPDF auto-scales base64 images if we give width/height
+          doc.addImage(image, imgType, boxX, boxY, boxWidth, boxHeight);
+        } catch (err) {
+          console.error("Error adding image:", err);
+        }
       }
 
+      // Send PDF
       const pdfData = doc.output("arraybuffer");
-
       res.setHeader("Content-Type", "application/pdf");
       res.setHeader("Content-Disposition", "attachment; filename=biodata.pdf");
       res.send(Buffer.from(pdfData));
