@@ -5,18 +5,76 @@ export default async function handler(req, res) {
     return res.status(405).end();
   }
 
-  const { name, age, education, occupation, address } = req.body;
+  const {
+    name, birthName, dob, birthTime, birthPlace, district,
+    gotra, height, bloodGroup, qualification, occupation,
+    fatherName, motherName, sisterName, residence,
+    permanentAddress, mobileMother, mobileMama, photo
+  } = req.body;
 
   const pdfDoc = await PDFDocument.create();
-  const page = pdfDoc.addPage([600, 400]);
+  const page = pdfDoc.addPage([800, 600]);
   const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
 
-  page.drawText("Biodata", { x: 250, y: 350, size: 20, font, color: rgb(0, 0, 0.8) });
-  page.drawText(`Name: ${name}`, { x: 50, y: 300, size: 14, font });
-  page.drawText(`Age: ${age}`, { x: 50, y: 270, size: 14, font });
-  page.drawText(`Education: ${education}`, { x: 50, y: 240, size: 14, font });
-  page.drawText(`Occupation: ${occupation}`, { x: 50, y: 210, size: 14, font });
-  page.drawText(`Address: ${address}`, { x: 50, y: 180, size: 14, font });
+  // Title
+  page.drawText(`BIO DATA : ${name}`, {
+    x: 250,
+    y: 550,
+    size: 18,
+    font,
+    color: rgb(0, 0, 0),
+  });
+
+  // Left column details
+  const details = [
+    ["Name", name],
+    ["Birth Name", birthName],
+    ["DOB", dob],
+    ["Birth time", birthTime],
+    ["Birth Place", birthPlace],
+    ["District", district],
+    ["Gotra", gotra],
+    ["Height", height],
+    ["Blood Group", bloodGroup],
+    ["Qualification", qualification],
+    ["Occupation", occupation],
+    ["Father Name", fatherName],
+    ["Mother Name", motherName],
+    ["Sister Name", sisterName],
+    ["Residence", residence],
+    ["Permanent Address", permanentAddress],
+    ["Mobile Number (Mother)", mobileMother],
+    ["Mobile Number (Mama)", mobileMama],
+  ];
+
+  let y = 500;
+  details.forEach(([label, value]) => {
+    page.drawText(`• ${label} : ${value || "-"}`, {
+      x: 50,
+      y,
+      size: 12,
+      font,
+      color: rgb(0, 0, 0),
+    });
+    y -= 25;
+  });
+
+  // Add Photo (if uploaded)
+  if (photo) {
+    try {
+      const imageBytes = Buffer.from(photo, "base64");
+      const img = await pdfDoc.embedJpg(imageBytes).catch(() => pdfDoc.embedPng(imageBytes));
+      const { width, height } = img.scale(0.3);
+      page.drawImage(img, {
+        x: 550,
+        y: 250,
+        width,
+        height,
+      });
+    } catch (e) {
+      console.error("Error embedding photo:", e);
+    }
+  }
 
   const pdfBytes = await pdfDoc.save();
 
