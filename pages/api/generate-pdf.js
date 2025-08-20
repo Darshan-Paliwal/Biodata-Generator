@@ -8,8 +8,9 @@ export default async function handler(req, res) {
   try {
     const data = req.body;
 
+    // A4 page
     const pdfDoc = await PDFDocument.create();
-    const page = pdfDoc.addPage([595, 842]); // A4
+    const page = pdfDoc.addPage([595, 842]);
     const { height } = page.getSize();
 
     const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
@@ -17,26 +18,17 @@ export default async function handler(req, res) {
     // Title
     page.drawText("Biodata", {
       x: 230,
-      y: height - 50,
+      y: height - 60,
       size: 22,
       font,
       color: rgb(0, 0, 0),
     });
 
-    // Fixed photo box
+    // --- Image reserved box (same as sample image you shared) ---
     const boxX = 400;
     const boxY = height - 350;
     const boxWidth = 150;
     const boxHeight = 200;
-
-    page.drawRectangle({
-      x: boxX,
-      y: boxY,
-      width: boxWidth,
-      height: boxHeight,
-      borderColor: rgb(0, 0, 0),
-      borderWidth: 1,
-    });
 
     // Handle photo
     if (data.photo) {
@@ -52,17 +44,16 @@ export default async function handler(req, res) {
           img = await pdfDoc.embedPng(imgBytes);
         }
 
-        const imgDims = img.scale(1);
+        // natural dimensions
+        const { width: imgW, height: imgH } = img.size();
 
-        const scale = Math.min(
-          1,
-          boxWidth / imgDims.width,
-          boxHeight / imgDims.height
-        );
+        // scale proportionally to fit inside the box
+        const scale = Math.min(boxWidth / imgW, boxHeight / imgH, 1);
 
-        const finalWidth = imgDims.width * scale;
-        const finalHeight = imgDims.height * scale;
+        const finalWidth = imgW * scale;
+        const finalHeight = imgH * scale;
 
+        // center inside reserved box
         const offsetX = boxX + (boxWidth - finalWidth) / 2;
         const offsetY = boxY + (boxHeight - finalHeight) / 2;
 
@@ -78,7 +69,7 @@ export default async function handler(req, res) {
     }
 
     // Left-side details
-    let y = height - 100;
+    let y = height - 110;
     const gap = 22;
 
     Object.entries(data).forEach(([key, value]) => {
