@@ -6,7 +6,7 @@ export async function POST(req) {
     const data = await req.json();
 
     const pdfDoc = await PDFDocument.create();
-    const page = pdfDoc.addPage([595, 842]); // A4 size
+    const page = pdfDoc.addPage([595, 842]); // A4
     const { height } = page.getSize();
 
     const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
@@ -20,7 +20,7 @@ export async function POST(req) {
       color: rgb(0, 0, 0),
     });
 
-    // Draw photo box (fixed boundary)
+    // Fixed photo box (reference boundary)
     const boxX = 400;
     const boxY = height - 350;
     const boxWidth = 150;
@@ -35,7 +35,7 @@ export async function POST(req) {
       borderWidth: 1,
     });
 
-    // Insert photo if provided
+    // Handle photo
     if (data.photo) {
       try {
         const imgBytes = Uint8Array.from(atob(data.photo), (c) =>
@@ -49,8 +49,12 @@ export async function POST(req) {
           img = await pdfDoc.embedPng(imgBytes);
         }
 
+        // Get original size
         const imgDims = img.scale(1);
+
+        // Only scale down if needed
         const scale = Math.min(
+          1,
           boxWidth / imgDims.width,
           boxHeight / imgDims.height
         );
@@ -58,6 +62,7 @@ export async function POST(req) {
         const finalWidth = imgDims.width * scale;
         const finalHeight = imgDims.height * scale;
 
+        // Center inside the box
         const offsetX = boxX + (boxWidth - finalWidth) / 2;
         const offsetY = boxY + (boxHeight - finalHeight) / 2;
 
@@ -72,7 +77,7 @@ export async function POST(req) {
       }
     }
 
-    // Draw text fields
+    // Left-side details
     let y = height - 100;
     const gap = 22;
 
