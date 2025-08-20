@@ -9,7 +9,7 @@ export default async function handler(req, res) {
     const { name, age, education, occupation, address, phone, email, imageBase64 } = req.body;
 
     const pdfDoc = await PDFDocument.create();
-    const page = pdfDoc.addPage([24000, 18000]); // A4 portrait (width x height in points)
+    const page = pdfDoc.addPage([2400, 1800]); // A4 portrait (width x height in points)
     const { width, height } = page.getSize();
 
     const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
