@@ -21,6 +21,7 @@ export default function Home() {
     mobileMother: "",
     mobileMama: "",
     photo: null,
+    photoType: null,
   });
 
   const handleChange = (e) => {
@@ -28,11 +29,15 @@ export default function Home() {
   };
 
   const handleFile = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
     const reader = new FileReader();
     reader.onloadend = () => {
-      setFormData({ ...formData, photo: reader.result.split(",")[1] });
+      const base64 = reader.result.split(",")[1];
+      setFormData({ ...formData, photo: base64, photoType: file.type });
     };
-    reader.readAsDataURL(e.target.files[0]);
+    reader.readAsDataURL(file);
   };
 
   const handleDownload = async () => {
@@ -57,7 +62,7 @@ export default function Home() {
         <h1 className="text-2xl font-bold mb-4 text-center">Biodata Generator</h1>
         <form className="grid grid-cols-2 gap-4">
           {Object.keys(formData).map((key) =>
-            key !== "photo" ? (
+            key !== "photo" && key !== "photoType" ? (
               <input
                 key={key}
                 type="text"
@@ -69,7 +74,12 @@ export default function Home() {
               />
             ) : null
           )}
-          <input type="file" accept="image/*" onChange={handleFile} className="col-span-2" />
+          <input
+            type="file"
+            accept="image/*"
+            onChange={handleFile}
+            className="col-span-2"
+          />
         </form>
         <button
           onClick={handleDownload}
