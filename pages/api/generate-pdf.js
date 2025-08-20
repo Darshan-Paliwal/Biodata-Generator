@@ -5,36 +5,39 @@ export default async function handler(req, res) {
     try {
       const { formData, image } = req.body;
 
-      // Large high-res PDF (landscape)
+      // Use A4 in landscape → safe & looks consistent
       const doc = new jsPDF({
         orientation: "landscape",
-        unit: "px",
-        format: [2400, 1800],
+        unit: "pt",
+        format: "a4",
       });
 
-      // Title centered at top
-      doc.setFontSize(100);
-      doc.text("Biodata", 1200, 150, { align: "center" });
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
 
-      // Left column for text
-      doc.setFontSize(60);
-      let y = 350;
+      // Title
+      doc.setFontSize(28);
+      doc.text("Biodata", pageWidth / 2, 60, { align: "center" });
+
+      // Left column text
+      doc.setFontSize(16);
+      let y = 120;
       for (const [key, value] of Object.entries(formData)) {
-        doc.text(`${key}: ${value}`, 200, y);
-        y += 90; // line spacing
+        doc.text(`${key}: ${value}`, 80, y);
+        y += 28;
       }
 
-      // Right column for image
+      // Right column image
       if (image) {
         try {
           let imgType = "JPEG";
           if (image.startsWith("data:image/png")) imgType = "PNG";
 
-          // Reserve big area for image
-          const imgX = 1400;
-          const imgY = 300;
-          const imgW = 800; // scale nicely
-          const imgH = 1000;
+          // Image box on the right half
+          const imgW = 250;
+          const imgH = 300;
+          const imgX = pageWidth - imgW - 80;
+          const imgY = 120;
 
           doc.addImage(image, imgType, imgX, imgY, imgW, imgH);
         } catch (err) {
@@ -42,7 +45,7 @@ export default async function handler(req, res) {
         }
       }
 
-      // Send PDF back
+      // Send PDF
       const pdfData = doc.output("arraybuffer");
       res.setHeader("Content-Type", "application/pdf");
       res.setHeader("Content-Disposition", "attachment; filename=biodata.pdf");
