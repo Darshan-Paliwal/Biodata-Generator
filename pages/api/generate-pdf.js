@@ -1,9 +1,12 @@
-import { NextResponse } from "next/server";
 import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
 
-export async function POST(req) {
+export default async function handler(req, res) {
+  if (req.method !== "POST") {
+    return res.status(405).json({ error: "Method not allowed" });
+  }
+
   try {
-    const data = await req.json();
+    const data = req.body;
 
     const pdfDoc = await PDFDocument.create();
     const page = pdfDoc.addPage([595, 842]); // A4
@@ -20,7 +23,7 @@ export async function POST(req) {
       color: rgb(0, 0, 0),
     });
 
-    // Fixed photo box (reference boundary)
+    // Fixed photo box
     const boxX = 400;
     const boxY = height - 350;
     const boxWidth = 150;
@@ -49,10 +52,8 @@ export async function POST(req) {
           img = await pdfDoc.embedPng(imgBytes);
         }
 
-        // Get original size
         const imgDims = img.scale(1);
 
-        // Only scale down if needed
         const scale = Math.min(
           1,
           boxWidth / imgDims.width,
@@ -62,7 +63,6 @@ export async function POST(req) {
         const finalWidth = imgDims.width * scale;
         const finalHeight = imgDims.height * scale;
 
-        // Center inside the box
         const offsetX = boxX + (boxWidth - finalWidth) / 2;
         const offsetY = boxY + (boxHeight - finalHeight) / 2;
 
@@ -94,15 +94,14 @@ export async function POST(req) {
       }
     });
 
+    // Save & send
     const pdfBytes = await pdfDoc.save();
-    return new NextResponse(pdfBytes, {
-      status: 200,
-      headers: {
-        "Content-Type": "application/pdf",
-        "Content-Disposition": "attachment; filename=biodata.pdf",
-      },
-    });
+
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", "attachment; filename=biodata.pdf");
+    res.send(Buffer.from(pdfBytes));
   } catch (err) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    console.error("PDF generation failed:", err);
+    res.status(500).json({ error: "PDF generation failed" });
   }
 }
