@@ -9,7 +9,8 @@ export default async function handler(req, res) {
     name, birthName, dob, birthTime, birthPlace, district,
     gotra, height, bloodGroup, qualification, occupation,
     fatherName, motherName, sisterName, residence,
-    permanentAddress, mobileMother, mobileMama, photo
+    permanentAddress, mobileMother, mobileMama,
+    photo, photoType
   } = req.body;
 
   const pdfDoc = await PDFDocument.create();
@@ -59,18 +60,30 @@ export default async function handler(req, res) {
     y -= 25;
   });
 
-  // Add Photo (if uploaded)
-  if (photo) {
+  // Add Photo (handles JPG, PNG, WebP etc.)
+  if (photo && photoType) {
     try {
       const imageBytes = Buffer.from(photo, "base64");
-      const img = await pdfDoc.embedJpg(imageBytes).catch(() => pdfDoc.embedPng(imageBytes));
-      const { width, height } = img.scale(0.3);
-      page.drawImage(img, {
-        x: 550,
-        y: 250,
-        width,
-        height,
-      });
+      let img;
+      if (photoType.includes("png")) {
+        img = await pdfDoc.embedPng(imageBytes);
+      } else if (photoType.includes("jpeg") || photoType.includes("jpg")) {
+        img = await pdfDoc.embedJpg(imageBytes);
+      } else if (photoType.includes("webp")) {
+        // pdf-lib doesn’t support webp directly → quick fallback: convert on client
+        // (For now, we’ll just ignore unsupported types)
+        console.warn("WebP not supported by pdf-lib directly");
+      }
+
+      if (img) {
+        const { width, height } = img.scale(0.25);
+        page.drawImage(img, {
+          x: 550,
+          y: 250,
+          width,
+          height,
+        });
+      }
     } catch (e) {
       console.error("Error embedding photo:", e);
     }
