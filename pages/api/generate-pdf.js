@@ -1,60 +1,40 @@
 import { jsPDF } from "jspdf";
 
 export default async function handler(req, res) {
-  if (req.method === "POST") {
-    try {
-      const { formData, image } = req.body;
+  try {
+    // Create PDF with custom large dimensions (2400x1800 points)
+    const doc = new jsPDF({
+      orientation: "p",
+      unit: "pt",
+      format: [2400, 1800]
+    });
 
-      // Use A4 in landscape → safe & looks consistent
-      const doc = new jsPDF({
-        orientation: "landscape",
-        unit: "pt",
-        format: "a4",
-      });
+    // Example text
+    doc.setFontSize(60);
+    doc.text("Darshan Paliwal - CV", 100, 150);
 
+    // Example image placement (replace with req.body.image if dynamic)
+    // Make sure you pass Base64 image when calling this API
+    if (req.body?.image) {
+      const img = req.body.image; // Base64 string like: "data:image/png;base64,...."
+      
+      // Page dimensions
       const pageWidth = doc.internal.pageSize.getWidth();
       const pageHeight = doc.internal.pageSize.getHeight();
 
-      // Title
-      doc.setFontSize(28);
-      doc.text("Biodata", pageWidth / 2, 60, { align: "center" });
-
-      // Left column text
-      doc.setFontSize(16);
-      let y = 120;
-      for (const [key, value] of Object.entries(formData)) {
-        doc.text(`${key}: ${value}`, 80, y);
-        y += 28;
-      }
-
-      // Right column image
-      if (image) {
-        try {
-          let imgType = "JPEG";
-          if (image.startsWith("data:image/png")) imgType = "PNG";
-
-          // Image box on the right half
-          const imgW = 250;
-          const imgH = 300;
-          const imgX = pageWidth - imgW - 80;
-          const imgY = 120;
-
-          doc.addImage(image, imgType, imgX, imgY, imgW, imgH);
-        } catch (err) {
-          console.error("Error adding image:", err);
-        }
-      }
-
-      // Send PDF
-      const pdfData = doc.output("arraybuffer");
-      res.setHeader("Content-Type", "application/pdf");
-      res.setHeader("Content-Disposition", "attachment; filename=biodata.pdf");
-      res.send(Buffer.from(pdfData));
-    } catch (error) {
-      console.error("PDF generation error:", error);
-      res.status(500).json({ error: "Failed to generate PDF" });
+      // Put image inside, scaled properly
+      doc.addImage(img, "PNG", 0, 0, pageWidth, pageHeight, undefined, "FAST");
     }
-  } else {
-    res.status(405).json({ error: "Method not allowed" });
+
+    // Generate PDF as ArrayBuffer
+    const pdfBuffer = doc.output("arraybuffer");
+
+    // ✅ Important headers for browser to download PDF
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", "attachment; filename=biodata.pdf");
+    res.send(Buffer.from(pdfBuffer));
+  } catch (error) {
+    console.error("PDF generation failed:", error);
+    res.status(500).json({ error: "Failed to generate PDF" });
   }
 }
