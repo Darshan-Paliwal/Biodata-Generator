@@ -1,106 +1,103 @@
-import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
+import { NextResponse } from "next/server";
+import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
 
-export default async function handler(req, res) {
-  if (req.method !== "POST") {
-    return res.status(405).end();
-  }
+export async function POST(req) {
+  try {
+    const data = await req.json();
 
-  const {
-    name, birthName, dob, birthTime, birthPlace, district,
-    gotra, height, bloodGroup, qualification, occupation,
-    fatherName, motherName, sisterName, residence,
-    permanentAddress, mobileMother, mobileMama,
-    photo
-  } = req.body;
+    const pdfDoc = await PDFDocument.create();
+    const page = pdfDoc.addPage([595, 842]); // A4 size
+    const { height } = page.getSize();
 
-  const pdfDoc = await PDFDocument.create();
-  const page = pdfDoc.addPage([800, 600]);
-  const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+    const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
 
-  const pageWidth = page.getWidth();
-  const pageHeight = page.getHeight();
-
-  // Title
-  page.drawText(`BIO DATA : ${name || ""}`, {
-    x: pageWidth / 2 - 80,
-    y: pageHeight - 40,
-    size: 18,
-    font,
-    color: rgb(0, 0, 0),
-  });
-
-  // Left column details
-  const details = [
-    ["Name", name],
-    ["Birth Name", birthName],
-    ["DOB", dob],
-    ["Birth Time", birthTime],
-    ["Birth Place", birthPlace],
-    ["District", district],
-    ["Gotra", gotra],
-    ["Height", height],
-    ["Blood Group", bloodGroup],
-    ["Qualification", qualification],
-    ["Occupation", occupation],
-    ["Father Name", fatherName],
-    ["Mother Name", motherName],
-    ["Sister Name", sisterName],
-    ["Residence", residence],
-    ["Permanent Address", permanentAddress],
-    ["Mobile Number (Mother)", mobileMother],
-    ["Mobile Number (Mama)", mobileMama],
-  ];
-
-  let y = pageHeight - 80;
-  details.forEach(([label, value]) => {
-    page.drawText(`• ${label} : ${value || "-"}`, {
-      x: 50,
-      y,
-      size: 12,
+    // Title
+    page.drawText("Biodata", {
+      x: 230,
+      y: height - 50,
+      size: 22,
       font,
       color: rgb(0, 0, 0),
     });
-    y -= 25;
-  });
 
-  // Add Photo (right side under heading, fixed box)
-  if (photo) {
-    try {
-      const imageBytes = Buffer.from(photo, "base64");
-      const img = await pdfDoc.embedJpg(imageBytes);
+    // Draw photo box (fixed boundary)
+    const boxX = 400;
+    const boxY = height - 350;
+    const boxWidth = 150;
+    const boxHeight = 200;
 
-      // Fixed box for photo
-      const boxWidth = 200;
-      const boxHeight = 250;
+    page.drawRectangle({
+      x: boxX,
+      y: boxY,
+      width: boxWidth,
+      height: boxHeight,
+      borderColor: rgb(0, 0, 0),
+      borderWidth: 1,
+    });
 
-      const x = pageWidth - boxWidth - 50;  // margin from right
-      const y = pageHeight - boxHeight - 80; // just under the title
+    // Insert photo if provided
+    if (data.photo) {
+      try {
+        const imgBytes = Uint8Array.from(atob(data.photo), (c) =>
+          c.charCodeAt(0)
+        );
 
-      page.drawImage(img, {
-        x,
-        y,
-        width: boxWidth,
-        height: boxHeight,
-      });
+        let img;
+        if (data.photo.startsWith("/9j/")) {
+          img = await pdfDoc.embedJpg(imgBytes);
+        } else {
+          img = await pdfDoc.embedPng(imgBytes);
+        }
 
-      // Optional border/frame around photo
-      page.drawRectangle({
-        x,
-        y,
-        width: boxWidth,
-        height: boxHeight,
-        borderColor: rgb(0, 0, 0),
-        borderWidth: 1,
-      });
+        const imgDims = img.scale(1);
+        const scale = Math.min(
+          boxWidth / imgDims.width,
+          boxHeight / imgDims.height
+        );
 
-    } catch (e) {
-      console.error("Error embedding photo:", e);
+        const finalWidth = imgDims.width * scale;
+        const finalHeight = imgDims.height * scale;
+
+        const offsetX = boxX + (boxWidth - finalWidth) / 2;
+        const offsetY = boxY + (boxHeight - finalHeight) / 2;
+
+        page.drawImage(img, {
+          x: offsetX,
+          y: offsetY,
+          width: finalWidth,
+          height: finalHeight,
+        });
+      } catch (err) {
+        console.error("Image embedding failed:", err.message);
+      }
     }
+
+    // Draw text fields
+    let y = height - 100;
+    const gap = 22;
+
+    Object.entries(data).forEach(([key, value]) => {
+      if (key !== "photo" && value) {
+        page.drawText(`${key}: ${value}`, {
+          x: 50,
+          y,
+          size: 12,
+          font,
+          color: rgb(0, 0, 0),
+        });
+        y -= gap;
+      }
+    });
+
+    const pdfBytes = await pdfDoc.save();
+    return new NextResponse(pdfBytes, {
+      status: 200,
+      headers: {
+        "Content-Type": "application/pdf",
+        "Content-Disposition": "attachment; filename=biodata.pdf",
+      },
+    });
+  } catch (err) {
+    return NextResponse.json({ error: err.message }, { status: 500 });
   }
-
-  const pdfBytes = await pdfDoc.save();
-
-  res.setHeader("Content-Type", "application/pdf");
-  res.setHeader("Content-Disposition", "attachment; filename=biodata.pdf");
-  res.send(Buffer.from(pdfBytes));
 }
