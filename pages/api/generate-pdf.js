@@ -2,39 +2,58 @@ import { jsPDF } from "jspdf";
 
 export default async function handler(req, res) {
   try {
-    // Create PDF with custom large dimensions (2400x1800 points)
+    // Create PDF (large size)
     const doc = new jsPDF({
       orientation: "p",
       unit: "pt",
-      format: [2400, 1800]
+      format: [2400, 1800],
     });
 
-    // Example text
+    // Add test text
     doc.setFontSize(60);
     doc.text("Darshan Paliwal - CV", 100, 150);
 
-    // Example image placement (replace with req.body.image if dynamic)
-    // Make sure you pass Base64 image when calling this API
-    if (req.body?.image) {
-      const img = req.body.image; // Base64 string like: "data:image/png;base64,...."
-      
-      // Page dimensions
+    // If image provided in POST body, add it
+    if (req.method === "POST" && req.body?.image) {
+      const img = req.body.image; // Base64 string (data:image/png;base64,...)
+
       const pageWidth = doc.internal.pageSize.getWidth();
       const pageHeight = doc.internal.pageSize.getHeight();
 
-      // Put image inside, scaled properly
-      doc.addImage(img, "PNG", 0, 0, pageWidth, pageHeight, undefined, "FAST");
+      // Scale to fit page while keeping ratio
+      const imgProps = doc.getImageProperties(img);
+      const imgRatio = imgProps.width / imgProps.height;
+      const pageRatio = pageWidth / pageHeight;
+
+      let renderWidth, renderHeight, x, y;
+
+      if (imgRatio > pageRatio) {
+        // Image is wider → fit width
+        renderWidth = pageWidth;
+        renderHeight = pageWidth / imgRatio;
+        x = 0;
+        y = (pageHeight - renderHeight) / 2;
+      } else {
+        // Image is taller → fit height
+        renderHeight = pageHeight;
+        renderWidth = pageHeight * imgRatio;
+        x = (pageWidth - renderWidth) / 2;
+        y = 0;
+      }
+
+      doc.addImage(img, "PNG", x, y, renderWidth, renderHeight, undefined, "FAST");
     }
 
-    // Generate PDF as ArrayBuffer
-    const pdfBuffer = doc.output("arraybuffer");
+    // Output PDF as Node Buffer
+    const pdfBuffer = Buffer.from(doc.output("arraybuffer"));
 
-    // ✅ Important headers for browser to download PDF
+    // Set proper headers
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", "attachment; filename=biodata.pdf");
-    res.send(Buffer.from(pdfBuffer));
+
+    return res.end(pdfBuffer); // ✅ send as PDF, not JSON
   } catch (error) {
-    console.error("PDF generation failed:", error);
-    res.status(500).json({ error: "Failed to generate PDF" });
+    console.error("❌ PDF generation failed:", error);
+    return res.status(500).json({ error: "Failed to generate PDF" });
   }
 }
