@@ -1,93 +1,71 @@
-import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
+import { jsPDF } from "jspdf";
 
 export default async function handler(req, res) {
-  if (req.method !== "POST") {
-    return res.status(405).json({ error: "Method not allowed" });
-  }
+  if (req.method === "POST") {
+    try {
+      const { formData, image } = req.body;
 
-  try {
-    const { name, age, education, occupation, address, phone, email, imageBase64 } = req.body;
-
-    const pdfDoc = await PDFDocument.create();
-    const page = pdfDoc.addPage([2400, 1800]); // A4 portrait (width x height in points)
-    const { width, height } = page.getSize();
-
-    const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
-
-    // Title
-    page.drawText("Biodata", {
-      x: width / 2 - 40,
-      y: height - 60,
-      size: 20,
-      font,
-      color: rgb(0, 0, 0),
-    });
-
-    // Left side text
-    let textY = height - 100;
-    const lineHeight = 20;
-    const details = [
-      `Name: ${name}`,
-      `Age: ${age}`,
-      `Education: ${education}`,
-      `Occupation: ${occupation}`,
-      `Address: ${address}`,
-      `Phone: ${phone}`,
-      `Email: ${email}`,
-    ];
-
-    details.forEach((line) => {
-      page.drawText(line, {
-        x: 50,
-        y: textY,
-        size: 12,
-        font,
-        color: rgb(0, 0, 0),
+      // Create high-resolution PDF with bigger page size
+      const doc = new jsPDF({
+        orientation: "landscape",
+        unit: "px",
+        format: [2400, 1800], // custom dimensions
       });
-      textY -= lineHeight;
-    });
 
-    // Right side image box (half of the page width)
-    if (imageBase64) {
-      const base64Data = imageBase64.split(",")[1];
-      let image;
-      if (imageBase64.startsWith("data:image/png")) {
-        image = await pdfDoc.embedPng(base64Data);
-      } else {
-        image = await pdfDoc.embedJpg(base64Data);
+      // Title
+      doc.setFontSize(48);
+      doc.text("Biodata", 100, 100);
+
+      // Add biodata text (left side)
+      doc.setFontSize(28);
+      let y = 200;
+      for (const [key, value] of Object.entries(formData)) {
+        doc.text(`${key}: ${value}`, 100, y);
+        y += 50;
       }
 
-      const imgDims = image.scale(1);
+      // If image exists
+      if (image) {
+        const img = new Image();
+        img.src = image;
 
-      const boxX = width * 0.55;
-      const boxY = 100;
-      const boxWidth = width * 0.35;
-      const boxHeight = height - 200;
+        await new Promise((resolve, reject) => {
+          img.onload = () => resolve();
+          img.onerror = reject;
+        });
 
-      // Scale proportionally
-      let scale = Math.min(boxWidth / imgDims.width, boxHeight / imgDims.height);
-      const imgWidth = imgDims.width * scale;
-      const imgHeight = imgDims.height * scale;
+        // Reserved area for image (right side)
+        const boxX = 1600;
+        const boxY = 200;
+        const boxWidth = 600;
+        const boxHeight = 1000;
 
-      // Center inside box
-      const imgX = boxX + (boxWidth - imgWidth) / 2;
-      const imgY = boxY + (boxHeight - imgHeight) / 2;
+        const imgWidth = img.width;
+        const imgHeight = img.height;
 
-      page.drawImage(image, {
-        x: imgX,
-        y: imgY,
-        width: imgWidth,
-        height: imgHeight,
-      });
+        // Scale image proportionally to fit inside reserved box
+        const scale = Math.min(boxWidth / imgWidth, boxHeight / imgHeight);
+
+        const finalWidth = imgWidth * scale;
+        const finalHeight = imgHeight * scale;
+
+        // Center image inside reserved box
+        const offsetX = boxX + (boxWidth - finalWidth) / 2;
+        const offsetY = boxY + (boxHeight - finalHeight) / 2;
+
+        doc.addImage(img, "JPEG", offsetX, offsetY, finalWidth, finalHeight);
+      }
+
+      const pdfData = doc.output("arraybuffer");
+
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader("Content-Disposition", "attachment; filename=biodata.pdf");
+      res.send(Buffer.from(pdfData));
+    } catch (error) {
+      console.error("PDF generation error:", error);
+      res.status(500).json({ error: "Failed to generate PDF" });
     }
-
-    const pdfBytes = await pdfDoc.save();
-
-    res.setHeader("Content-Type", "application/pdf");
-    res.setHeader("Content-Disposition", "attachment; filename=biodata.pdf");
-    res.send(Buffer.from(pdfBytes));
-  } catch (err) {
-    console.error("PDF generation error:", err);
-    res.status(500).json({ error: "Failed to generate PDF" });
+  } else {
+    res.status(405).json({ error: "Method not allowed" });
   }
 }
